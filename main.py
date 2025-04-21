@@ -140,7 +140,14 @@ class GitBot:
                 if repo.name == string:
                     return repo
             else:
-                if repo.url == string:
+                if 'api' in string:
+                    tmp = repo.url.split('//')
+                    new_url = tmp[0] + '//api.' + tmp[1]
+                    tmp = new_url.split('.com')
+                    new_url = tmp[0] + '.com/repos' + tmp[1]
+                else:
+                    new_url = repo.url
+                if new_url == string:
                     return repo
         return None
 

@@ -1,4 +1,4 @@
-from colorama import Fore
+from colorama import Fore,  Style
 
 def log(log_type: str, message: str) -> None:
     if not isinstance(log_type, str) or not isinstance(message, str):
@@ -13,5 +13,9 @@ def log(log_type: str, message: str) -> None:
             print(f"[{Fore.RED}ERROR{Fore.RESET}]: {message}")
         case "success":
             print(f"[{Fore.GREEN}SUCCESS{Fore.RESET}]: {message}")
+        case "debug":
+            print(f"[{Fore.CYAN}DEBUG{Fore.RESET}]: {message}")
+        case "critical":
+            print(f"[{Fore.RED}{Style.BRIGHT}CRITICAL{Style.RESET_ALL}{Fore.RESET}]: {message}")
         case _:
             raise TypeError(f"Unknown log type: '{log_type}'")

@@ -46,14 +46,14 @@ class GitBot:
             log('info', "Réponse \"pong\" envoyée")
 
         @self.bot.command()
-        async def add_channel(ctx, arg: str) -> None:
+        async def add_channel(ctx, arg: str, branch: str = "*") -> None:
             name = arg.split('/')[-1]
             url = arg
             repo = self.search_repo(url)
             if not repo:
                 repo = Repo(name, url)
                 self.repos.append(repo)
-            repo.add_channel(ctx.channel)
+            repo.add_channel(ctx.channel, branch)
             
             log("success", f"Channel '{ctx.channel.name}' added to the list of channels to notify for the repo '{repo.name}'.")
             await ctx.send(f"Channel {ctx.channel.name} ajouté à la liste des channels à notifier pour le repo {repo.name}.\nL'url donné n'est pas vérifié, assurez-vous qu'il soit correct.")
@@ -85,8 +85,8 @@ class GitBot:
             
             repo = self.search_repo(name, name=True)
             if repo:
-                channels = ', '.join([channel.name for channel in repo.channels])
-                await ctx.send(f"Channels à notifier pour le repo {repo.name} : {channels}")
+                channels = '\n'.join([f"{channel['channel'].name} for branch: {channel['branch']}" for channel in repo.channels])
+                await ctx.send(f"Channels à notifier pour le repo {repo.name} :\n{channels}")
                 return
             log("warning", f"No repo found with the name '{name}'")
             await ctx.send(f"Aucun repo trouvé avec le nom donné '{name}'")
@@ -119,10 +119,12 @@ class GitBot:
         repos = []
         for data in datas['repos']:
             repo = Repo(data['name'], data['url'])
-            for channel_id in data['channels']:
+            for channel_loaded in data['channels']:
+                channel_id = channel_loaded['channel']
+                branch = channel_loaded['branch']
                 channel = self.bot.get_channel(channel_id)
                 if channel:
-                    repo.add_channel(channel)
+                    repo.add_channel(channel, branch)
                 else:
                     log("warning", f"Channel '{channel_id}' non trouvé")
             repos.append(repo)
@@ -169,10 +171,11 @@ class GitBot:
                 log('info', f"Will send : {message}")
 
                 repo = self.search_repo(data['payload']['repository']['url'])
+                branch = data['payload']['ref'].split('/')[-1]
                 for channel in repo.channels:
-                    if channel:
-                        await channel.send(message)
-                        log('success', f"Message sent to {channel.name}")
+                    if channel and (channel['branch'] == branch or channel['branch'] == "*"):
+                        await channel["channel"].send(message)
+                        log('success', f"Message sent to {channel['channel'].name}")
 
         except Exception as e:
             log("error", e.__str__())

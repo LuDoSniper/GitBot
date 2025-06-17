@@ -46,14 +46,35 @@ class GitBot:
             log('info', "Réponse \"pong\" envoyée")
 
         @self.bot.command()
-        async def add_channel(ctx, arg: str, branch: str = "*") -> None:
+        async def add_channel(ctx, arg: str, branch: str = "*", interested_roles: str = "everyone") -> None:
             name = arg.split('/')[-1]
             url = arg
+
+            raw_roles = interested_roles.split(',')
+            roles = []
+            for role in raw_roles:
+                role = role.strip()
+                if role.startswith('<@&') and role.endswith('>'):
+                    role_id = int(role[3:-1])
+                    role_obj = ctx.guild.get_role(role_id)
+                    if role_obj:
+                        roles.append(role_id)
+                    else:
+                        log("warning", f"Role with ID '{role_id}' not found in the guild.")
+                elif role.startswith('@'):
+                    role_name = role[1:].strip()
+                    if role_name != "everyone":
+                        log("warning", "Role name should not start with '@' unless it's everyone. Ignoring it.")
+                    else:
+                        roles.append(role_name)
+            if not roles:
+                roles = ["everyone"]
+
             repo = self.search_repo(url)
             if not repo:
                 repo = Repo(name, url)
                 self.repos.append(repo)
-            repo.add_channel(ctx.channel, branch)
+            repo.add_channel(ctx.channel, branch, roles)
             
             log("success", f"Channel '{ctx.channel.name}' added to the list of channels to notify for the repo '{repo.name}'.")
             await ctx.send(f"Channel {ctx.channel.name} ajouté à la liste des channels à notifier pour le repo {repo.name}.\nL'url donné n'est pas vérifié, assurez-vous qu'il soit correct.")
@@ -122,9 +143,10 @@ class GitBot:
             for channel_loaded in data['channels']:
                 channel_id = channel_loaded['channel']
                 branch = channel_loaded['branch']
+                roles = channel_loaded['roles']
                 channel = self.bot.get_channel(channel_id)
                 if channel:
-                    repo.add_channel(channel, branch)
+                    repo.add_channel(channel, branch, roles)
                 else:
                     log("warning", f"Channel '{channel_id}' non trouvé")
             repos.append(repo)
@@ -167,14 +189,15 @@ class GitBot:
                     case _:
                         log("error", data['error'])
             else:
-                message = f"@everyone\nNouveau push sur `{data['repository']}` par `{data['pusher']}`:\n> Commit : [{data['payload']['commits'][-1]['message']}](<{data['payload']['commits'][-1]['url']}>)\n> Branche : `{data['payload']['ref'].split('/')[-1]}`"
+                message = f"Nouveau push sur `{data['repository']}` par `{data['pusher']}`:\n> Commit : [{data['payload']['commits'][-1]['message']}](<{data['payload']['commits'][-1]['url']}>)\n> Branche : `{data['payload']['ref'].split('/')[-1]}`"
                 log('info', f"Will send : {message}")
 
                 repo = self.search_repo(data['payload']['repository']['url'])
                 branch = data['payload']['ref'].split('/')[-1]
                 for channel in repo.channels:
                     if channel and (channel['branch'] == branch or channel['branch'] == "*"):
-                        await channel["channel"].send(message)
+                        updated_message = ' '.join(['@everyone' if role_id == 'everyone' else f'<@&{role_id}>' for role_id in channel['roles']]) + '\n' + message
+                        await channel["channel"].send(updated_message)
                         log('success', f"Message sent to {channel['channel'].name}")
 
         except Exception as e:

@@ -8,15 +8,16 @@ class Repo:
 
         self.name = name
         self.url = url
-        self.channels: list[dict[str, discord.TextChannel|str]] = []
+        self.channels: list[dict[str, discord.TextChannel|str|int]] = []
 
-    def add_channel(self, channel: discord.TextChannel, branch: str = "*") -> None:
+    def add_channel(self, channel: discord.TextChannel, branch: str = "*", roles: list[int|str] = ["everyone"]) -> None:
         if not isinstance(channel, discord.TextChannel):
             raise TypeError(f"Argument 'channel' must be a discord.TextChannel. '{type(channel).__name__}' given.")
 
         self.channels.append({
             "channel": channel,
-            "branch": branch
+            "branch": branch,
+            "roles": roles
         })
         log("info", f"Channel '{channel.name}' added to the list of channels to notify for the repo '{self.name}'.")
     
@@ -43,8 +44,9 @@ class Repo:
         channels = []
         for channel in self.channels:
             data = {
-                "id": channel['channel'].id,
-                "branch": channel['branch']
+                "channel": channel['channel'].id,
+                "branch": channel['branch'],
+                "roles": channel['roles']
             }
             channels.append(data)
         return channels
